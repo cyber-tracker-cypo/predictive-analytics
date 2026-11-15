@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Predictive Analytics & Forecasting Dashboard</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col">
+
+    <!-- Top Navigation Bar -->
+    <header class="bg-slate-900 text-white shadow-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="bg-emerald-600 p-2 rounded-lg text-white">
+                    <i class="fa-solid fa-arrow-trend-up text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold tracking-tight">Predictive Analytics & Forecasting</h1>
+                    <p class="text-xs text-slate-400">Time-Series & Regression Modeling Engine</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-3">
+                <label class="cursor-pointer bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium px-3 py-2 rounded-lg border border-slate-700 transition flex items-center space-x-2">
+                    <i class="fa-solid fa-file-arrow-up"></i>
+                    <span>Upload Historical CSV</span>
+                    <input type="file" id="csvInput" accept=".csv" class="hidden" onchange="handleCSVUpload(event)">
+                </label>
+                <button onclick="downloadForecastCSV()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium px-3 py-2 rounded-lg transition flex items-center space-x-2 shadow-sm">
+                    <i class="fa-solid fa-download"></i>
+                    <span>Export Forecast</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-grow w-full space-y-6">
+
+        <!-- Model Controls & Hyperparameters -->
+        <section class="bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div class="flex items-center space-x-2 text-slate-900 font-semibold text-sm">
+                    <i class="fa-solid fa-sliders text-emerald-600"></i>
+                    <span>Forecasting Model Parameters & Preprocessing</span>
+                </div>
+                <button onclick="resetModel()" class="text-xs text-emerald-600 hover:text-emerald-800 font-medium transition">
+                    Reset Defaults
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- Regression Model Selector -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Forecasting Algorithm</label>
+                    <select id="modelSelect" onchange="runForecastModel()" class="w-full bg-slate-50 border border-slate-300 text-slate-800 text-sm rounded-xl px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        <option value="linear">Ordinary Least Squares (Linear Regression)</option>
+                        <option value="seasonal">Seasonal Trend Decomposition (Holt-Winters Sim)</option>
+                        <option value="moving_avg">Exponential Moving Average (EMA)</option>
+                    </select>
+                </div>
+
+                <!-- Forecast Horizon -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Forecast Horizon (Months)</label>
+                    <select id="horizonSelect" onchange="runForecastModel()" class="w-full bg-slate-50 border border-slate-300 text-slate-800 text-sm rounded-xl px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        <option value="3">Next 3 Months</option>
+                        <option value="6" selected>Next 6 Months</option>
+                        <option value="12">Next 12 Months</option>
+                    </select>
+                </div>
+
+                <!-- Outlier Cleaning Toggle -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Data Preprocessing</label>
+                    <select id="cleanSelect" onchange="runForecastModel()" class="w-full bg-slate-50 border border-slate-300 text-slate-800 text-sm rounded-xl px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        <option value="cleaned" selected>Remove Outliers & Smooth Noise</option>
+                        <option value="raw">Raw Unfiltered Historical Data</option>
+                    </select>
+                </div>
+
+                <!-- Confidence Interval -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Confidence Band</label>
+                    <select id="ciSelect" onchange="runForecastModel()" class="w-full bg-slate-50 border border-slate-300 text-slate-800 text-sm rounded-xl px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        <option value="0.08">95% Confidence Interval (±8%)</option>
+                        <option value="0.05">90% Confidence Interval (±5%)</option>
+                        <option value="0.15">99% Confidence Interval (±15%)</option>
+                    </select>
+                </div>
+            </div>
+        </section>
+
+        <!-- Model Evaluation Metrics (KPIs) -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- R-Squared Score -->
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Model Accuracy (R²)</p>
+                    <h3 id="kpiR2" class="text-2xl font-bold text-slate-900 mt-1">0.00%</h3>
+                    <span class="inline-flex items-center text-xs font-medium text-emerald-600 mt-1">
+                        <i class="fa-solid fa-bullseye mr-1"></i> Variance Explained
+                    </span>
+                </div>
+                <div class="bg-emerald-50 text-emerald-600 p-3 rounded-xl">
+                    <i class="fa-solid fa-check-double text-xl"></i>
+                </div>
+            </div>
+
+            <!-- RMSE -->
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">RMSE Error</p>
+                    <h3 id="kpiRMSE" class="text-2xl font-bold text-slate-900 mt-1">$0</h3>
+                    <span class="inline-flex items-center text-xs font-medium text-blue-600 mt-1">
+                        <i class="fa-solid fa-ruler mr-1"></i> Root Mean Sq. Error
+                    </span>
+                </div>
+                <div class="bg-blue-50 text-blue-600 p-3 rounded-xl">
+                    <i class="fa-solid fa-wave-square text-xl"></i>
+                </div>
+            </div>
+
+            <!-- Projected Growth -->
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Projected Growth</p>
+                    <h3 id="kpiGrowth" class="text-2xl font-bold text-slate-900 mt-1">+0.0%</h3>
+                    <span class="inline-flex items-center text-xs font-medium text-purple-600 mt-1">
+                        <i class="fa-solid fa-rocket mr-1"></i> Forecast Horizon
+                    </span>
+                </div>
+                <div class="bg-purple-50 text-purple-600 p-3 rounded-xl">
+                    <i class="fa-solid fa-chart-line text-xl"></i>
+                </div>
+            </div>
+
+            <!-- Next Period Prediction -->
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Next Month Forecast</p>
+                    <h3 id="kpiNextMonth" class="text-2xl font-bold text-slate-900 mt-1">$0</h3>
+                    <span class="inline-flex items-center text-xs font-medium text-amber-600 mt-1">
+                        <i class="fa-solid fa-calendar-check mr-1"></i> Predicted Value
+                    </span>
+                </div>
+                <div class="bg-amber-50 text-amber-600 p-3 rounded-xl">
+                    <i class="fa-solid fa-crystal-ball fa-wand-magic-sparkles text-xl"></i>
+                </div>
+            </div>
+        </section>
+
+        <!-- Primary Forecast Visualization & Residuals -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Main Time-Series Forecast Chart (Takes 2 columns on desktop) -->
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col lg:col-span-2">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-bold text-slate-800 text-sm sm:text-base flex items-center space-x-2">
+                        <i class="fa-solid fa-chart-area text-emerald-600"></i>
+                        <span>Historical Actuals vs. Future Predictions</span>
+                    </h3>
+                    <div class="flex items-center space-x-3 text-xs">
+                        <span class="flex items-center"><span class="w-3 h-3 rounded-full bg-slate-800 inline-block mr-1"></span> Historical</span>
+                        <span class="flex items-center"><span class="w-3 h-3 rounded-full bg-emerald-500 inline-block mr-1"></span> Forecast</span>
+                    </div>
+                </div>
+                <div class="relative h-80 w-full">
+                    <canvas id="forecastChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Residual Error Distribution Chart -->
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-bold text-slate-800 text-sm sm:text-base flex items-center space-x-2">
+                        <i class="fa-solid fa-chart-bar text-emerald-600"></i>
+                        <span>Model Residuals (Actual - Fit)</span>
+                    </h3>
+                </div>
+                <div class="relative h-80 w-full">
+                    <canvas id="residualChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- Forecast Predictions Ledger Table -->
+        <section class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="p-4 sm:p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <h3 class="font-bold text-slate-800 text-base flex items-center space-x-2">
+                    <i class="fa-solid fa-table text-emerald-600"></i>
+                    <span>Historical & Predicted Data Table</span>
+                </h3>
+                <span class="text-xs text-slate-500">Includes Upper & Lower Confidence Bounds</span>
+            </div>
+            <div class="overflow-x-auto max-h-96">
+                <table class="w-full text-left border-collapse text-xs sm:text-sm">
+                    <thead class="bg-slate-100 text-slate-600 uppercase font-semibold sticky top-0">
+                        <tr>
+                            <th class="p-3">Period (YYYY-MM)</th>
+                            <th class="p-3">Data Type</th>
+                            <th class="p-3 text-right">Actual Value</th>
+                            <th class="p-3 text-right">Model Prediction</th>
+                            <th class="p-3 text-right">Lower Bound</th>
+                            <th class="p-3 text-right">Upper Bound</th>
+                        </tr>
+                    </thead>
+                    <tbody id="forecastTableBody" class="divide-y divide-slate-100 text-slate-700">
+                        <!-- Populated by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 py-4 mt-auto">
+        <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-500">
+            Predictive Analytics Using Historical Data • Linear Regression & Time-Series Forecasting Dashboard
+        </div>
+    </footer>
+
+    <!-- Application Script -->
+    <script>
+        // Default 24 Months of Historical Business Revenue Data (2025-01 to 2026-12)
+        const defaultHistoricalData = [
+            { period: '2025-01', actual: 42100 },
+            { period: '2025-02', actual: 43800 },
+            { period: '2025-03', actual: 46200 },
+            { period: '2025-04', actual: 45900 },
+            { period: '2025-05', actual: 49500 },
+            { period: '2025-06', actual: 52100 },
+            { period: '2025-07', actual: 51400 },
+            { period: '2025-08', actual: 54800 },
+            { period: '2025-09', actual: 57200 },
+            { period: '2025-10', actual: 59600 },
+            { period: '2025-11', actual: 64500 },
+            { period: '2025-12', actual: 68900 },
+            { period: '2026-01', actual: 58200 },
+            { period: '2026-02', actual: 60400 },
+            { period: '2026-03', actual: 63800 },
+            { period: '2026-04', actual: 65100 },
+            { period: '2026-05', actual: 67900 },
+            { period: '2026-06', actual: 71200 },
+            { period: '2026-07', actual: 70500 },
+            { period: '2026-08', actual: 74300 },
+            { period: '2026-09', actual: 77800 },
+            { period: '2026-10', actual: 81200 },
+            { period: '2026-11', actual: 85900 },
+            { period: '2026-12', actual: 91400 }
+        ];
+
+        let historicalData = [...defaultHistoricalData];
+        let combinedResults = [];
+        let forecastChartInstance = null;
+        let residualChartInstance = null;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            runForecastModel();
+        });
+
+        function resetModel() {
+            historicalData = [...defaultHistoricalData];
+            document.getElementById('modelSelect').value = 'linear';
+            document.getElementById('horizonSelect').value = '6';
+            document.getElementById('cleanSelect').value = 'cleaned';
+            document.getElementById('ciSelect').value = '0.08';
+            runForecastModel();
+        }
+
+        // Preprocess: Optional 3-point moving average smoothing for outlier reduction
+        function preprocessData(data, mode) {
+            if (mode === 'raw' || data.length < 3) return data.map(d => ({ ...d }));
+            return data.map((item, idx, arr) => {
+                if (idx === 0 || idx === arr.length - 1) return { ...item };
+                const smoothed = Math.round((arr[idx - 1].actual * 0.2) + (item.actual * 0.6) + (arr[idx + 1].actual * 0.2));
+                return { period: item.period, actual: smoothed };
+            });
+        }
+
+        // Ordinary Least Squares (OLS) Linear Regression Calculation
+        function calculateLinearRegression(yValues) {
+            const n = yValues.length;
+            let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+
+            for (let i = 0; i < n; i++) {
+                sumX += i;
+                sumY += yValues[i];
+                sumXY += i * yValues[i];
+                sumXX += i * i;
+            }
+
+            const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+            const intercept = (sumY - slope * sumX) / n;
+
+            return { slope, intercept };
+        }
+
+        function getNextMonthLabel(lastPeriod, offset) {
+            const parts = lastPeriod.split('-');
+            let year = parseInt(parts[0]);
+            let month = parseInt(parts[1]);
+
+            month += offset;
+            while (month > 12) {
+                month -= 12;
+                year += 1;
+            }
+            return `${year}-${String(month).padStart(2, '0')}`;
+        }
+
+        function runForecastModel() {
+            const modelType = document.getElementById('modelSelect').value;
+            const horizon = parseInt(document.getElementById('horizonSelect').value);
+            const cleanMode = document.getElementById('cleanSelect').value;
+            const ciMargin = parseFloat(document.getElementById('ciSelect').value);
+
+            const processed = preprocessData(historicalData, cleanMode);
+            const yVals = processed.map(d => d.actual);
+            const n = yVals.length;
+
+            const { slope, intercept } = calculateLinearRegression(yVals);
+
+            // Calculate historical fitted values & accuracy metrics
+            let ssRes = 0;
+            let ssTot = 0;
+            const meanY = yVals.reduce((a, b) => a + b, 0) / n;
+            const residuals = [];
+
+            combinedResults = [];
+
+            for (let i = 0; i < n; i++) {
+                let fitted = intercept + slope * i;
+
+                // Add seasonal adjustment if selected
+                if (modelType === 'seasonal') {
+                    const monthIndex = parseInt(processed[i].period.split('-')[1]);
+                    const seasonalFactor = (monthIndex === 11 || monthIndex === 12) ? 1.07 : (monthIndex === 1 ? 0.94 : 0.99);
+                    fitted = fitted * seasonalFactor;
+                } else if (modelType === 'moving_avg' && i > 0) {
+                    fitted = (fitted * 0.5) + (yVals[i - 1] * 0.5);
+                }
+
+                fitted = Math.round(fitted);
+                const actual = processed[i].actual;
+                const residual = actual - fitted;
+                residuals.push(residual);
+
+                ssRes += Math.pow(actual - fitted, 2);
+                ssTot += Math.pow(actual - meanY, 2);
+
+                combinedResults.push({
+                    period: processed[i].period,
+                    type: 'Historical',
+                    actual: actual,
+                    predicted: fitted,
+                    lower: Math.round(fitted * (1 - ciMargin)),
+                    upper: Math.round(fitted * (1 + ciMargin))
+                });
+            }
+
+            // R-Squared and RMSE
+            const rSquared = Math.max(0, Math.min(0.998, 1 - (ssRes / ssTot)));
+            const rmse = Math.round(Math.sqrt(ssRes / n));
+
+            // Generate future predictions
+            const lastPeriod = processed[n - 1].period;
+            const lastActual = processed[n - 1].actual;
+
+            for (let h = 1; h <= horizon; h++) {
+                const futureIndex = n - 1 + h;
+                const futurePeriod = getNextMonthLabel(lastPeriod, h);
+                let pred = intercept + slope * futureIndex;
+
+                if (modelType === 'seasonal') {
+                    const monthIndex = parseInt(futurePeriod.split('-')[1]);
+                    const seasonalFactor = (monthIndex === 11 || monthIndex === 12) ? 1.07 : (monthIndex === 1 ? 0.94 : 0.99);
+                    pred = pred * seasonalFactor;
+                } else if (modelType === 'moving_avg') {
+                    pred = (pred * 0.7) + (lastActual * 0.3);
+                }
+
+                pred = Math.round(pred);
+                // Widening confidence interval slightly over horizon
+                const dynamicMargin = ciMargin * (1 + (h * 0.08));
+
+                combinedResults.push({
+                    period: futurePeriod,
+                    type: 'Forecast',
+                    actual: null,
+                    predicted: pred,
+                    lower: Math.round(pred * (1 - dynamicMargin)),
+                    upper: Math.round(pred * (1 + dynamicMargin))
+                });
+            }
+
+            // Update KPI Cards
+            const nextMonthPred = combinedResults[n].predicted;
+            const endForecastPred = combinedResults[combinedResults.length - 1].predicted;
+            const growthPct = (((endForecastPred - lastActual) / lastActual) * 100).toFixed(1);
+
+            document.getElementById('kpiR2').textContent = `${(rSquared * 100).toFixed(1)}%`;
+            document.getElementById('kpiRMSE').textContent = `$${rmse.toLocaleString()}`;
+            document.getElementById('kpiGrowth').textContent = `${growthPct >= 0 ? '+' : ''}${growthPct}%`;
+            document.getElementById('kpiNextMonth').textContent = `$${nextMonthPred.toLocaleString()}`;
+
+            renderForecastChart();
+            renderResidualChart(processed.map(d => d.period), residuals);
+            renderForecastTable();
+        }
+
+        function renderForecastChart() {
+            const labels = combinedResults.map(r => r.period);
+            const actualSeries = combinedResults.map(r => r.actual);
+            const forecastSeries = combinedResults.map(r => r.predicted);
+            const upperSeries = combinedResults.map(r => r.type === 'Forecast' ? r.upper : null);
+            const lowerSeries = combinedResults.map(r => r.type === 'Forecast' ? r.lower : null);
+
+            if (forecastChartInstance) forecastChartInstance.destroy();
+            const ctx = document.getElementById('forecastChart').getContext('2d');
+
+            forecastChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Historical Actual',
+                            data: actualSeries,
+                            borderColor: '#1e293b',
+                            backgroundColor: '#1e293b',
+                            borderWidth: 2.5,
+                            pointRadius: 3,
+                            tension: 0.25
+                        },
+                        {
+                            label: 'Model Fit & Forecast',
+                            data: forecastSeries,
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            borderDash: [6, 4],
+                            borderWidth: 2.5,
+                            pointRadius: 3,
+                            tension: 0.25
+                        },
+                        {
+                            label: 'Upper Confidence Bound',
+                            data: upperSeries,
+                            borderColor: 'rgba(16, 185, 129, 0.35)',
+                            borderWidth: 1,
+                            pointRadius: 0,
+                            fill: false
+                        },
+                        {
+                            label: 'Lower Confidence Bound',
+                            data: lowerSeries,
+                            borderColor: 'rgba(16, 185, 129, 0.35)',
+                            backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                            borderWidth: 1,
+                            pointRadius: 0,
+                            fill: '-1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } },
+                    scales: {
+                        y: { beginAtZero: false, grid: { color: '#f1f5f9' } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        function renderResidualChart(labels, residuals) {
+            if (residualChartInstance) residualChartInstance.destroy();
+            const ctx = document.getElementById('residualChart').getContext('2d');
+
+            residualChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Residual Error ($)',
+                        data: residuals,
+                        backgroundColor: residuals.map(v => v >= 0 ? '#34d399' : '#f87171'),
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { grid: { color: '#f1f5f9' } },
+                        x: { display: false }
+                    }
+                }
+            });
+        }
+
+        function renderForecastTable() {
+            const tbody = document.getElementById('forecastTableBody');
+            tbody.innerHTML = '';
+
+            combinedResults.forEach(row => {
+                const isForecast = row.type === 'Forecast';
+                const tr = document.createElement('tr');
+                tr.className = isForecast ? 'bg-emerald-50/50 hover:bg-emerald-50 transition' : 'hover:bg-slate-50 transition';
+
+                tr.innerHTML = `
+                    <td class="p-3 font-medium text-slate-900">${row.period}</td>
+                    <td class="p-3">
+                        <span class="px-2 py-0.5 rounded text-xs font-semibold ${isForecast ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}">
+                            ${row.type}
+                        </span>
+                    </td>
+                    <td class="p-3 text-right font-medium text-slate-800">${row.actual !== null ? '$' + row.actual.toLocaleString() : '—'}</td>
+                    <td class="p-3 text-right font-bold ${isForecast ? 'text-emerald-700' : 'text-slate-700'}">$${row.predicted.toLocaleString()}</td>
+                    <td class="p-3 text-right text-slate-500">$${row.lower.toLocaleString()}</td>
+                    <td class="p-3 text-right text-slate-500">$${row.upper.toLocaleString()}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function downloadForecastCSV() {
+            let csv = "Period,Type,Actual,Predicted,LowerBound,UpperBound\n";
+            combinedResults.forEach(r => {
+                csv += `${r.period},${r.type},${r.actual !== null ? r.actual : ''},${r.predicted},${r.lower},${r.upper}\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'predictive_forecast_results.csv';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        function handleCSVUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const lines = e.target.result.split('\n');
+                const parsed = [];
+                for (let i = 1; i < lines.length; i++) {
+                    const cols = lines[i].trim().split(',');
+                    if (cols.length >= 2 && !isNaN(parseFloat(cols[1]))) {
+                        parsed.push({
+                            period: cols[0].trim(),
+                            actual: parseFloat(cols[1].trim())
+                        });
+                    }
+                }
+                if (parsed.length >= 4) {
+                    historicalData = parsed;
+                    runForecastModel();
+                    alert(`Loaded ${parsed.length} historical periods and updated forecast model!`);
+                } else {
+                    alert('Please upload a CSV with at least 4 rows and columns: Period, Value');
+                }
+            };
+            reader.readAsText(file);
+        }
+    </script>
+</body>
+</html>
